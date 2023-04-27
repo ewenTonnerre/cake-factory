@@ -15,9 +15,9 @@ internal class AlgoEwenTonnerreNicolasMary : Algorithme
     /// <inheritdoc />
     public override void ConfigurerUsine(IConfigurationUsine builder)
     {
-        builder.NombrePréparateurs = 10;
-        builder.NombreFours = 6;
-        builder.NombreEmballeuses = 15;
+        builder.NombrePréparateurs = 15;
+        builder.NombreFours = 9;
+        builder.NombreEmballeuses = 9;
     }
 
     private class OrdreProduction
@@ -51,7 +51,8 @@ internal class AlgoEwenTonnerreNicolasMary : Algorithme
                     tâchesEmballage.Add(_emballeuses.ProduireAsync(gâteauCuit, _token));
 
                 await foreach (var gâteauEmballé in tâchesEmballage.EnumerateCompleted().WithCancellation(_token))
-                    yield return gâteauEmballé;
+                    if (!gâteauEmballé.EstConforme) _usine.MettreAuRebut(gâteauEmballé);
+                    else yield return gâteauEmballé;
             }
         }
 
@@ -66,8 +67,9 @@ internal class AlgoEwenTonnerreNicolasMary : Algorithme
                 tachesCuisson.Add(_fours.ProduireAsync(bainGâteauxCrus, _token));
 
             await foreach (var bainGâteauxCuits in tachesCuisson.EnumerateCompleted().WithCancellation(_token))
-            foreach (var gâteauCuit in bainGâteauxCuits)
-                yield return gâteauCuit;
+            foreach (var gâteauCuit in bainGâteauxCuits.Where(gâteau => gâteau.EstConforme))
+                if (!gâteauCuit.EstConforme) _usine.MettreAuRebut(gâteauCuit);
+                else yield return gâteauCuit;
         }
 
         private async IAsyncEnumerable<GâteauCru[]> PréparerConformesParBainAsync(
@@ -106,7 +108,11 @@ internal class AlgoEwenTonnerreNicolasMary : Algorithme
                     gâteauxPrêts!.Add(gateau);
                     Interlocked.Increment(ref gâteauxConformes);
                 }
-                else Interlocked.Increment(ref gâteauxRatés);
+                else
+                {
+                    _usine.MettreAuRebut(gateau);
+                    Interlocked.Increment(ref gâteauxRatés);
+                }
             }
 
             var spawner = TakeNextAndSpawnChild(0);
